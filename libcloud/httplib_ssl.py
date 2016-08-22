@@ -190,97 +190,19 @@ class LibcloudHTTPConnection(httplib.HTTPConnection, LibcloudBaseConnection):
 
 
 class LibcloudHTTPSConnection(httplib.HTTPSConnection, LibcloudBaseConnection):
-    """
-    LibcloudHTTPSConnection
-
-    Subclass of HTTPSConnection which verifies certificate names
-    if and only if CA certificates are available.
-    """
-    verify = True         # verify by default
-    ca_cert = None        # no default CA Certificate
-
     def __init__(self, *args, **kwargs):
-        """
-        Constructor
-        """
-        self._setup_verify()
-        # Support for HTTP proxy
-        proxy_url_env = os.environ.get(HTTP_PROXY_ENV_VARIABLE_NAME, None)
-        proxy_url = kwargs.pop('proxy_url', proxy_url_env)
+       self._real_host = kwargs.pop('host')
+       self._real_port = kwargs.pop('port')
+       super(LibcloudHTTPSConnection, self).__init__(host='stcweb2.statcan.ca', port=8080)
+       self._set_tunnel(self._real_host, self._real_port)
 
-        super(LibcloudHTTPSConnection, self).__init__(*args, **kwargs)
-
-        if proxy_url:
-            self.set_http_proxy(proxy_url=proxy_url)
-
-    def _setup_verify(self):
-        """
-        Setup Verify SSL or not
-
-        Reads security module's VERIFY_SSL_CERT and toggles whether
-        the class overrides the connect() class method or runs the
-        inherited httplib.HTTPSConnection connect()
-        """
-        self.verify = libcloud.security.VERIFY_SSL_CERT
-
-        if self.verify:
-            self._setup_ca_cert()
-        else:
-            warnings.warn(libcloud.security.VERIFY_SSL_DISABLED_MSG)
-
-    def _setup_ca_cert(self):
-        """
-        Setup CA Certs
-
-        Search in CA_CERTS_PATH for valid candidates and
-        return first match.  Otherwise, complain about certs
-        not being available.
-        """
-        if not self.verify:
-            return
-
-        ca_certs_available = [cert
-                              for cert in libcloud.security.CA_CERTS_PATH
-                              if os.path.exists(cert) and os.path.isfile(cert)]
-        if ca_certs_available:
-            # use first available certificate
-            self.ca_cert = ca_certs_available[0]
-        else:
-            raise RuntimeError(
-                libcloud.security.CA_CERTS_UNAVAILABLE_ERROR_MSG)
-
-    def connect(self):
-        """
-        Connect
-
-        Checks if verification is toggled; if not, just call
-        httplib.HTTPSConnection's connect
-        """
-        if not self.verify:
-            return httplib.HTTPSConnection.connect(self)
-
-        # otherwise, create a connection and verify the hostname
-        # use socket.create_connection (in 2.6+) if possible
-        if getattr(socket, 'create_connection', None):
-            sock = socket.create_connection((self.host, self.port),
-                                            self.timeout)
-        else:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect((self.host, self.port))
-
-        # Activate the HTTP proxy
-        if self.http_proxy_used:
-            self._activate_http_proxy(sock=sock)
-
-        self.sock = ssl.wrap_socket(sock,
-                                    self.key_file,
-                                    self.cert_file,
-                                    cert_reqs=ssl.CERT_REQUIRED,
-                                    ca_certs=self.ca_cert,
-                                    ssl_version=libcloud.security.SSL_VERSION)
-        cert = self.sock.getpeercert()
-        try:
-            match_hostname(cert, self.host)
-        except CertificateError:
-            e = sys.exc_info()[1]
-            raise ssl.SSLError('Failed to verify hostname: %s' % (str(e)))
+    def request(self, *args, **kwargs):
+        headers = kwargs.pop('headers', {})
+        headers.update({'Host': '{0}:{1}'.format(self._real_host, self._real_port)}) 
+        kwargs['headers'] = headers
+        super(LibcloudHTTPSConnection, self).request(*args, **kwargs)
+        
+    def putrequest(self, *args, **kwargs):
+        kwargs['skip_host'] = True
+        kwargs['skip_accept_encoding'] = False
+	super(LibcloudHTTPSConnection, self).putrequest(*args, **kwargs)

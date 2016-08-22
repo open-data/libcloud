@@ -133,7 +133,7 @@ class AzureConnection(ConnectionUserAndKey):
         )
 
         # Azure cribs about this in 'raw' connections
-        headers.pop('Host', None)
+        # headers.pop('Host', None)
 
         return params, headers
 
