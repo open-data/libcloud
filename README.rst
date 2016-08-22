@@ -1,3 +1,5 @@
+# DO NOT USE THIS FORK
+
 Apache Libcloud - a unified interface into the cloud
 ====================================================
 
