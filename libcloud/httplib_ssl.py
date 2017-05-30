@@ -194,7 +194,10 @@ class LibcloudHTTPSConnection(httplib.HTTPSConnection, LibcloudBaseConnection):
        self._real_host = kwargs.pop('host')
        self._real_port = kwargs.pop('port')
        super(LibcloudHTTPSConnection, self).__init__(host='stcweb2.statcan.ca', port=8080)
-       self._set_tunnel(self._real_host, self._real_port)
+       getattr(self, 'set_tunnel', self._set_tunnel)(
+           host=self._real_host,
+           port=self._real_port
+       )
 
     def request(self, *args, **kwargs):
         headers = kwargs.pop('headers', {})
